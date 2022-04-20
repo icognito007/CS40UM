@@ -26,11 +26,11 @@ struct memory
 purpose: segment struct that holds a uint32_t array of memory
     and a counter variable that keeps track of the length of array.  
 */
-struct segment
-{
-    uint32_t *currentMem;
-    uint32_t counter; 
-};
+// struct segment
+// {
+//     uint32_t *currentMem;
+//     uint32_t counter; 
+// };
 
 /*
 function: createMem 
@@ -73,14 +73,15 @@ output: none
 */
 void setFileMem (void * input, void* inputMemory, uint32_t length)
 {
+    (void) length;
     /* input the instructions into the first slot of the sequence */
     Seq_T access = ((memory)inputMemory)->activeMem;
     uint32_t *index = (uint32_t*)Stack_pop(((memory)inputMemory)->unmapStack);
-    segment initial = malloc (sizeof(struct segment)); 
-    assert(initial != NULL);
-    initial->counter = length;
-    initial->currentMem = (uint32_t *)input;
-    Seq_put(access, *index, (void *) initial);
+    //segment initial = malloc (sizeof(struct segment)); 
+    //assert(initial != NULL);
+    //initial->counter = length;
+    //initial->currentMem = (uint32_t *)input;
+    Seq_put(access, *index, input);
     free(index);
 }
 
@@ -96,14 +97,21 @@ uint32_t insertSeg (uint32_t length, void *initialMemory)
     Stack_T *stackMem = &(((memory) initialMemory)->unmapStack);
     Seq_T *currentSeq = &(((memory) initialMemory)->activeMem); 
     uint32_t index;
-    segment newSeg = (segment) malloc(sizeof(struct segment));
-    assert(newSeg != NULL);
-    newSeg->currentMem = (uint32_t*)malloc(length * 4);
-    assert(newSeg->currentMem != NULL);
-    for (uint32_t i = 0; i < length; i++){
-        (newSeg->currentMem)[i] = 0;
+
+    // DELETE
+    // segment newSeg = (segment) malloc(sizeof(struct segment));
+    // assert(newSeg != NULL);
+
+    /* magic ++length due insert one more element in array*/
+    uint32_t newSize = (length + 1) * 4;
+    uint32_t *currentMem = (uint32_t *)malloc(newSize);
+    assert(currentMem != NULL);
+    currentMem[0] = length;
+    for (uint32_t i = 1; i <= length; i++){
+        //printf("i: %d, length: %d\n", i, length);
+        (currentMem)[i] = 0;
     }
-    newSeg->counter = length;
+    // newSeg->counter = length;
 
     /* If the stack is empty, add a new slot at the end of the sequence */
     if (Stack_empty(*stackMem)){ 
@@ -116,7 +124,7 @@ uint32_t insertSeg (uint32_t length, void *initialMemory)
         free(temp);
     }
 
-    Seq_put(*currentSeq, index, newSeg);
+    Seq_put(*currentSeq, index, currentMem);
     return index;
 }
 
@@ -130,11 +138,12 @@ void delSeg (uint32_t index, void *initialMemory)
 {
     Stack_T *stackMem = &(((memory) initialMemory)->unmapStack);
     Seq_T *currentSeq = &(((memory) initialMemory)->activeMem); 
-    segment memory = (segment) Seq_put(*currentSeq,index,NULL);
+    
+    uint32_t *memory = (uint32_t *) Seq_put(*currentSeq,index,NULL);
 
     /*Free the memory array, the struct and add the index to the stack */
     assert(memory != NULL);
-    free(memory->currentMem);
+    //free(memory->currentMem);
     free(memory);
     uint32_t *stackIndex = (uint32_t *)malloc(sizeof(uint32_t));
     assert(stackIndex != NULL);
@@ -153,8 +162,9 @@ uint32_t getMem (void *initialMemory, uint32_t memIndex, uint32_t seqIndex)
 {
     Seq_T *access = &(((memory)initialMemory)->activeMem);
     assert(Seq_get(*access, memIndex)!= NULL);
-    assert(seqIndex < ((segment)Seq_get(*access, memIndex))->counter);
-    return (((segment)Seq_get(*access, memIndex))->currentMem)[seqIndex];
+    //fprintf(stderr, "seqIndex: %d, mem length: %d \n", seqIndex, ((uint32_t *)Seq_get(*access, memIndex))[0]);
+    assert(seqIndex < ((uint32_t *)Seq_get(*access, memIndex))[0]);
+    return ((uint32_t *)(Seq_get(*access, memIndex)))[++seqIndex];
 }
 
 /*
@@ -170,8 +180,8 @@ void setMem (void *initialMemory, uint32_t memIndex, uint32_t seqIndex,
 {
     Seq_T *access = &(((memory)initialMemory)->activeMem);
     assert(Seq_get(*access, memIndex)!= NULL); 
-    assert(seqIndex < ((segment)Seq_get(*access, memIndex))->counter);
-    (((segment)Seq_get(*access, memIndex))->currentMem)[seqIndex] = val;
+    assert(seqIndex < ((uint32_t *)Seq_get(*access, memIndex))[0]);
+    ((uint32_t *)Seq_get(*access, memIndex))[++seqIndex] = val;
 }
 
 /*
@@ -185,28 +195,27 @@ output: none
 void copyNReplace(uint32_t rB, uint32_t index, void *initialMemory, 
                                         uint32_t *count)
 {
-    segment duplicate = malloc (sizeof(struct segment)); 
-    assert(duplicate != NULL);
+    //segment duplicate = malloc (sizeof(struct segment)); 
+    //assert(duplicate != NULL);
     Seq_T *access = &(((memory)initialMemory)->activeMem);
     assert(Seq_get(*access, rB)!= NULL); 
-    segment temp = (segment)(Seq_get((((memory)initialMemory)->activeMem),rB));
-    duplicate->counter = temp->counter;
-    
+    uint32_t * temp = (uint32_t *)(Seq_get((((memory)initialMemory)->activeMem),rB));
+    uint32_t length = temp[0];
+    //printf("length: %d",length);
     /* magic number 4 */
-    duplicate->currentMem = (uint32_t*) malloc (4 * duplicate->counter);
-    assert(duplicate->currentMem != NULL);
+    uint32_t* currentMem = (uint32_t*) malloc (4 * length);
+    assert(currentMem != NULL);
+    currentMem[0] = length;
     /* Making a deep copy of the memory */
-    for (uint32_t i = 0; i < duplicate->counter; i++){
-        (duplicate->currentMem)[i] = (temp->currentMem)[i];
+    for (uint32_t i = 1; i <= length; i++){
+        (currentMem)[i] = (temp)[i];
     }
     /* Freeing the orignal M0 segment */
-    free(((segment)(Seq_get((((memory) initialMemory)->activeMem),0)))
-    -> currentMem);
-    free(((segment)(Seq_get((((memory) initialMemory)->activeMem),0))));
+    free((uint32_t *)(Seq_get((((memory) initialMemory)->activeMem), 0)));
 
     /* Putting the copied segment into the available M0 slot */
-    Seq_put(((memory) initialMemory)-> activeMem, index, (void *)duplicate);
-    *count = duplicate->counter;
+    Seq_put(((memory) initialMemory)-> activeMem, index, (void *)currentMem);
+    *count = length;
 }
 
 /*
@@ -218,7 +227,7 @@ output: returns the length of that memory segment.
 uint32_t getLength (void *initialMemory, uint32_t memIndex)
 {
     Seq_T access = ((memory)initialMemory)->activeMem;
-    return (((segment)Seq_get(access,memIndex))->counter);
+    return (((uint32_t *)Seq_get(access,memIndex))[0]);
 }
 
 /*
@@ -235,9 +244,9 @@ void freeFunc(void * initialMemory){
     Seq_T *currentSeq = &(((memory) initialMemory)->activeMem); 
     int length = Seq_length(*currentSeq);
     for( int i = 0; i < length; i++){
-        segment temp = (segment) Seq_get( *currentSeq,i);
+        uint32_t *temp = (uint32_t *) Seq_get( *currentSeq,i);
         if (temp != NULL){
-            free(temp->currentMem);
+           // free(temp->currentMem);
             free(temp);
         }
     }
