@@ -46,6 +46,7 @@ int main(int argc, char *argv[])
         processInstructions(registers, initialMemory);
     }
     else {
+        // TODO: ERROR HERE BUT WHAT DO THEY WANT??
         printf("No input file provided \n");
         return EXIT_FAILURE;
     } 
@@ -87,8 +88,11 @@ void readFile (FILE* file, void* inputMemory)
     int bytesPerElement = 4;
     int numElem = bytesInFile/bytesPerElement;
 
-    uint32_t *input = (uint32_t *)malloc(bytesInFile);
-    for(int i = 0; i < numElem; i++){
+    /* magic number 4 is used to make array one size bigger 
+        than required. First element  == length */
+    uint32_t *input = (uint32_t *)malloc(bytesInFile + 4);
+    input[0] =  numElem;
+    for(int i = 1; i <= numElem; i++){
         uint32_t temp = 0;
         for(int j = 24; j >= 0; j -= 8){
             temp = Bitpack_newu(temp, 8, j, fgetc(file));
@@ -111,12 +115,15 @@ void processInstructions(void * registers, void * initialMemory)
     uint32_t memIndex = 0;
     uint32_t count = getLength (initialMemory, memIndex);
     uint64_t instruction;
-    
+    uint32_t temp = 0;
         
     while (current < count){
         instruction = getMem (initialMemory, memIndex, current++);  
         //m0[current++];
         uint32_t opcode = Bitpack_getu(instruction, 4, 28);
+        if (temp++ < 14590){
+        //printf("opcode: %d\n", opcode);
+        }
         switch (opcode){
             case 0 :
             move(registers,instruction);
